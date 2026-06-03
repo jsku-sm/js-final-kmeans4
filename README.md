@@ -1,19 +1,30 @@
-# 🎈 Blank app template
+# 수학 학습자 유형 분석 Streamlit 웹앱
 
-A simple Streamlit app template for you to modify!
+K-평균 군집화를 활용해 수학불안, 자기효능감, 수학흥미, 학습태도 설문 결과를 시각화하는 웹앱입니다.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
+## 실행 방법
 
-### How to run it on your own machine
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-1. Install the requirements
+## 주요 기능
 
-   ```
-   $ pip install -r requirements.txt
-   ```
+- 구글폼 응답 CSV/XLSX 업로드
+- 수학불안, 자기효능감, 수학흥미, 학습태도 평균 자동 계산
+- T6 부정문항 자동 역채점
+- K 값 탐색: Elbow 그래프, Silhouette 점수, 보고서 문장 예시
+- 군집 시각화
+  - 원점수 평균 히트맵
+  - 표준화 평균 히트맵
+  - 표준화 군집 프로파일 레이더 차트
+  - PCA 군집 2차원 분포
+  - 수학불안과 학습태도의 관계
+  - K-평균 군집화 과정: Centroid 변화과정
+- 군집별 해석 및 맞춤형 지도 방안
+- 학생별 군집 결과 CSV 다운로드
 
-2. Run the app
+## 문항명 인식
 
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+구글폼 문항 제목 앞에 A1, E1, I1, T1 같은 문항 코드가 들어가 있으면 자동 인식률이 높습니다.
