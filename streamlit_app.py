@@ -9,10 +9,12 @@ K-평균 군집화를 활용한 수학 학습자 유형 분석 Streamlit 앱
 
 from __future__ import annotations
 
+import base64
 import io
 import re
 import textwrap
 import zipfile
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Optional
 
@@ -46,128 +48,160 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
-
 :root {
-  --bg:#f7f8fa;
+  --bg:#f4f5f7;
   --white:#ffffff;
-  --border:#e8eaed;
-  --text:#191f28;
-  --text2:#4e5968;
-  --text3:#8b95a1;
-  --blue:#1b64da;
-  --blue-bg:#eef3fd;
-  --red:#e03131;
-  --red-bg:#fff0f0;
-  --green:#0d9e75;
-  --green-bg:#e6f7f1;
-  --amber:#c47d0e;
-  --amber-bg:#fff8e6;
-  --purple:#6343c8;
-  --purple-bg:#f0edfc;
+  --ink:#111827;
+  --ink2:#374151;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --black:#0b0f19;
+  --red:#e11d48;
+  --red-soft:#fff1f2;
+  --blue:#2563eb;
+  --blue-soft:#eff6ff;
+  --green:#059669;
+  --green-soft:#ecfdf5;
+  --amber:#d97706;
+  --amber-soft:#fffbeb;
+  --purple:#7c3aed;
+  --purple-soft:#f5f3ff;
+  --shadow:0 24px 60px rgba(15,23,42,.08);
 }
 html, body, [class*="css"] {
-  font-family: 'Noto Sans KR', sans-serif;
+  font-family: Helvetica, "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  color: var(--ink);
 }
+body, .stApp { background: var(--bg); }
 .block-container {
-  padding-top: 1.2rem;
-  max-width: 1180px;
+  padding-top: 1.1rem;
+  padding-bottom: 3rem;
+  max-width: 1200px;
 }
 .report-header {
-  background: #ffffff;
-  border: 1px solid #e8eaed;
-  border-radius: 18px;
-  padding: 30px 34px 26px 34px;
-  margin-bottom: 18px;
-  box-shadow: 0 8px 26px rgba(25,31,40,0.035);
+  position: relative;
+  overflow: hidden;
+  min-height: 260px;
+  background:
+    radial-gradient(circle at 78% 18%, rgba(225,29,72,.28), transparent 30%),
+    linear-gradient(135deg, #0b0f19 0%, #141b2d 50%, #20293c 100%);
+  border: 0;
+  border-radius: 30px;
+  padding: 42px 46px;
+  margin-bottom: 22px;
+  box-shadow: var(--shadow);
+}
+.report-header::after {
+  content: "K";
+  position: absolute;
+  right: 42px;
+  bottom: -78px;
+  font-size: 300px;
+  line-height: .8;
+  font-weight: 900;
+  color: rgba(255,255,255,.08);
+  letter-spacing: -18px;
 }
 .kicker {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.10);
+  color: #f8fafc;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #1b64da;
-  margin-bottom: 8px;
-}
-.report-title {
-  font-size: 30px;
   font-weight: 800;
-  color: #191f28;
-  letter-spacing: -0.5px;
-  margin-bottom: 6px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.kicker::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--red); }
+.report-title {
+  max-width: 760px;
+  font-size: clamp(34px, 4.5vw, 58px);
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -2.4px;
+  line-height: 1.06;
+  margin-bottom: 14px;
 }
 .report-subtitle {
-  font-size: 15px;
-  color: #4e5968;
+  max-width: 760px;
+  font-size: 16px;
+  color: rgba(255,255,255,.76);
   line-height: 1.75;
 }
 .meta-wrap {
   display:flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 20px;
+  margin-top: 26px;
+  position:relative;
+  z-index:1;
 }
 .meta-chip {
   display:inline-flex;
   align-items:center;
-  gap: 7px;
-  background:#f7f8fa;
-  border:1px solid #e8eaed;
+  gap: 8px;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.16);
   border-radius:999px;
-  padding:6px 13px;
-  color:#4e5968;
+  padding:8px 13px;
+  color:#f8fafc;
   font-size:12px;
+  backdrop-filter: blur(8px);
 }
 .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.soft-card, .factor-card, .cluster-card {
+  background: rgba(255,255,255,.96);
+  border: 1px solid rgba(229,231,235,.95);
+  border-radius: 24px;
+  box-shadow: 0 14px 34px rgba(15,23,42,.055);
+}
 .soft-card {
-  background:#fff;
-  border:1px solid #e8eaed;
-  border-radius:16px;
-  padding:20px 22px;
-  margin-bottom: 16px;
-  box-shadow:0 6px 18px rgba(25,31,40,0.025);
+  padding: 26px 28px;
+  margin-bottom: 18px;
 }
 .small-label {
-  font-size:11px;
-  font-weight:700;
-  letter-spacing:1.8px;
-  color:#1b64da;
-  text-transform:uppercase;
-  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--red);
+  text-transform: uppercase;
+  margin-bottom: 10px;
 }
 .card-title {
-  font-size:18px;
-  font-weight:800;
-  color:#191f28;
-  margin-bottom:8px;
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -0.9px;
+  line-height: 1.22;
+  margin-bottom: 8px;
 }
 .card-text {
-  font-size:14px;
-  color:#4e5968;
-  line-height:1.75;
+  font-size: 15px;
+  color: var(--ink2);
+  line-height: 1.75;
 }
 .factor-card {
-  border:1px solid #e8eaed;
-  border-radius:14px;
-  padding:18px;
-  background:#fff;
+  padding:22px;
   height:100%;
+  transition: transform .15s ease, box-shadow .15s ease;
 }
+.factor-card:hover { transform: translateY(-2px); box-shadow: 0 20px 42px rgba(15,23,42,.09); }
 .factor-icon {
-  width:36px;
-  height:36px;
-  border-radius:10px;
+  width:44px;
+  height:44px;
+  border-radius:14px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-weight:800;
-  margin-bottom:10px;
+  font-weight:900;
+  margin-bottom:14px;
 }
 .cluster-card {
-  background:#fff;
-  border:1px solid #e8eaed;
-  border-radius:16px;
-  padding:20px;
+  padding:24px;
   height:100%;
   position:relative;
   overflow:hidden;
@@ -177,73 +211,115 @@ html, body, [class*="css"] {
   top:0;
   left:0;
   right:0;
-  height:5px;
+  height:6px;
 }
 .cluster-name {
-  font-size:20px;
-  font-weight:800;
-  margin:10px 0 4px 0;
+  font-size:28px;
+  font-weight:900;
+  letter-spacing:-1.1px;
+  margin:12px 0 6px 0;
 }
 .cluster-sub {
-  font-size:13px;
-  color:#4e5968;
+  font-size:14px;
+  color:var(--ink2);
   line-height:1.65;
-  margin-bottom:10px;
+  margin-bottom:14px;
 }
 .badge {
   display:inline-block;
   border-radius:999px;
-  padding:4px 10px;
-  font-size:11px;
-  font-weight:700;
-  margin: 2px 4px 2px 0;
+  padding:6px 11px;
+  font-size:12px;
+  font-weight:800;
+  margin: 3px 4px 3px 0;
 }
-.badge-red { background:#fff0f0; color:#e03131; }
-.badge-green { background:#e6f7f1; color:#0d9e75; }
-.badge-amber { background:#fff8e6; color:#c47d0e; }
-.badge-blue { background:#eef3fd; color:#1b64da; }
-.callout {
-  border-left:4px solid #1b64da;
-  background:#eef3fd;
-  border-radius:0 12px 12px 0;
-  padding:14px 18px;
-  color:#4e5968;
+.badge-red { background:var(--red-soft); color:var(--red); }
+.badge-green { background:var(--green-soft); color:var(--green); }
+.badge-amber { background:var(--amber-soft); color:var(--amber); }
+.badge-blue { background:var(--blue-soft); color:var(--blue); }
+.callout, .warning-callout {
+  border:0;
+  border-radius:24px;
+  padding:20px 24px;
   line-height:1.75;
-  margin:12px 0 18px 0;
+  margin:14px 0 20px 0;
+  box-shadow: 0 12px 30px rgba(15,23,42,.05);
+}
+.callout {
+  background:linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+  color:var(--ink2);
+  border-left:6px solid var(--blue);
 }
 .warning-callout {
-  border-left:4px solid #c47d0e;
-  background:#fff8e6;
-  border-radius:0 12px 12px 0;
-  padding:14px 18px;
-  color:#4e5968;
-  line-height:1.75;
-  margin:12px 0 18px 0;
+  background:linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+  color:var(--ink2);
+  border-left:6px solid var(--amber);
+}
+.slide-hero {
+  background:#0b0f19;
+  color:#fff;
+  border-radius:30px;
+  padding:40px;
+  margin:18px 0;
+  box-shadow:var(--shadow);
+}
+.slide-hero h2 { font-size:44px; line-height:1.08; letter-spacing:-1.8px; margin:0 0 12px 0; }
+.slide-hero p { color:rgba(255,255,255,.76); font-size:16px; line-height:1.7; margin:0; }
+.slide-number {
+  font-size:72px;
+  font-weight:900;
+  letter-spacing:-3px;
+  color:var(--red);
+}
+.slide-note {
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:18px 20px;
+  font-size:14px;
+  color:var(--muted);
+  line-height:1.65;
+  box-shadow:0 10px 24px rgba(15,23,42,.04);
 }
 .stTabs [data-baseweb="tab-list"] {
-  gap: 6px;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(15,23,42,.04);
 }
 .stTabs [data-baseweb="tab"] {
   border-radius: 999px;
-  padding: 10px 18px;
-  background: #ffffff;
-  border: 1px solid #e8eaed;
+  padding: 11px 16px;
+  background: transparent;
+  border: 0;
+  font-weight: 800;
+  color: var(--muted);
 }
 .stTabs [aria-selected="true"] {
-  background:#eef3fd !important;
-  color:#1b64da !important;
-  border:1px solid #dbe8fb !important;
+  background:#0b0f19 !important;
+  color:#ffffff !important;
+  border:0 !important;
 }
 div[data-testid="stMetric"] {
   background: #ffffff;
-  border: 1px solid #e8eaed;
-  border-radius: 14px;
-  padding: 14px 16px;
-  box-shadow:0 4px 14px rgba(25,31,40,0.025);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 18px 18px;
+  box-shadow:0 14px 34px rgba(15,23,42,.055);
 }
-hr {
-  margin: 1.3rem 0;
+div[data-testid="stMetric"] label { color:var(--muted); font-weight:800; }
+div[data-testid="stMetricValue"] { font-weight:900; letter-spacing:-.7px; }
+.stDataFrame, div[data-testid="stPlotlyChart"] {
+  border-radius: 22px;
+  overflow:hidden;
 }
+section[data-testid="stSidebar"] {
+  background:#ffffff;
+  border-right:1px solid var(--line);
+}
+hr { margin: 1.3rem 0; border-color:var(--line); }
 </style>
     """,
     unsafe_allow_html=True,
@@ -869,6 +945,168 @@ def report_markdown(res: AnalysisResult) -> str:
     return "\n".join(lines)
 
 
+
+
+# ─────────────────────────────────────────────────────────────
+# K 탐색 결과 리포트 화면
+# ─────────────────────────────────────────────────────────────
+def display_pdf_file(pdf_path: str, height: int = 640):
+    # Streamlit 화면 안에 PDF를 표시합니다. PDF 파일은 app.py와 같은 폴더에 있어야 합니다.
+    path = Path(pdf_path)
+    if not path.exists():
+        st.info("원본 PDF 파일을 찾을 수 없습니다. 앱 폴더에 PDF 파일을 함께 넣으면 원본 리포트를 볼 수 있습니다.")
+        return
+    with open(path, "rb") as f:
+        base64_pdf = base64.b64encode(f.read()).decode("utf-8")
+    pdf_display = f"""
+    <iframe
+        src="data:application/pdf;base64,{base64_pdf}"
+        width="100%"
+        height="{height}"
+        style="border:1px solid #e8eaed; border-radius:14px; background:#fff;"
+        type="application/pdf">
+    </iframe>
+    """
+    st.markdown(pdf_display, unsafe_allow_html=True)
+
+
+def render_k_exploration_result_tab():
+    # 업로드한 PDF 내용을 웹앱 탭 안에서 요약·표·원본 PDF로 보여줍니다.
+    section(
+        "K Exploration Result",
+        "변수 선택이 학생 군집화에 미치는 영향",
+        "변수 조합에 따라 최적 K는 달라지지만, 수업 적용 관점에서는 4개 변수를 모두 포함한 K=2 모델이 가장 실용적입니다.",
+    )
+
+    st.markdown(
+        """
+<div class="callout">
+  <b>핵심 결론</b><br>
+  수학불안, 자기효능감, 수학흥미, 학습태도를 모두 포함하면 <b>K=2</b>가 가장 안정적입니다.
+  학생의 마음은 다양하지만, 수업 지원 관점에서는 두 집단으로 보는 것이 가장 실용적입니다.
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(
+            '<div class="factor-card"><b>종합성</b><br><span style="color:#4e5968;font-size:13px">4개 변수가 학생의 정서·동기·행동을 함께 반영합니다.</span></div>',
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            '<div class="factor-card"><b>해석 가능성</b><br><span style="color:#4e5968;font-size:13px">K=2는 결과가 단순하여 학생 유형 해석이 쉽습니다.</span></div>',
+            unsafe_allow_html=True,
+        )
+    with c3:
+        st.markdown(
+            '<div class="factor-card"><b>수업 적용성</b><br><span style="color:#4e5968;font-size:13px">두 집단으로 나누면 맞춤형 지원 전략으로 바로 연결할 수 있습니다.</span></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.subheader("학생을 이해하는 4가지 렌즈")
+    lens_df = pd.DataFrame(
+        [
+            {"구분": "내면의 마음 상태", "변수": "수학불안", "의미": "수학 상황에서 느끼는 긴장과 걱정"},
+            {"구분": "내면의 마음 상태", "변수": "자기효능감", "의미": "수학을 해낼 수 있다는 자신감"},
+            {"구분": "내면의 마음 상태", "변수": "수학흥미", "의미": "수학에 대한 흥미와 참여 의지"},
+            {"구분": "실제적 참여", "변수": "학습태도", "의미": "계획, 성실성, 질문, 집중 등 학습 행동"},
+        ]
+    )
+    st.dataframe(lens_df, use_container_width=True, hide_index=True)
+    st.caption("정서·동기 변수는 학생의 마음 상태를, 학습태도는 실제 수업 참여를 보여줍니다.")
+
+    st.subheader("변수 조합별 최적 K값")
+    combo_df = pd.DataFrame(
+        [
+            {"조합": "수학불안 + 자기효능감 + 수학흥미 + 학습태도", "추천 K": 2, "해석": "가장 종합적이고 안정적인 구분"},
+            {"조합": "수학불안 + 자기효능감", "추천 K": 8, "해석": "학생 차이가 매우 세분화되어 나타남"},
+            {"조합": "수학불안 + 자기효능감 + 수학흥미", "추천 K": 7, "해석": "정서·동기 차이가 복잡하게 나타남"},
+            {"조합": "수학불안 + 수학흥미", "추천 K": 6, "해석": "불안과 흥미 조합에 다양한 유형 존재"},
+            {"조합": "수학불안 + 학습태도", "추천 K": 6, "해석": "불안과 실제 학습행동의 조합이 다양함"},
+            {"조합": "수학불안 + 자기효능감 + 학습태도", "추천 K": 2, "해석": "학습 지원 관점에서 안정적 구분"},
+            {"조합": "수학불안 + 수학흥미 + 학습태도", "추천 K": 2, "해석": "학습 참여 관점에서 안정적 구분"},
+        ]
+    )
+    st.dataframe(combo_df, use_container_width=True, hide_index=True)
+    st.caption("정서·동기 변수만 사용하면 K가 커지고, 학습태도를 포함하면 K=2로 안정되는 경향이 나타납니다.")
+
+    fig = px.bar(
+        combo_df,
+        x="추천 K",
+        y="조합",
+        orientation="h",
+        text="추천 K",
+        title="변수 조합별 추천 K값",
+        labels={"추천 K": "추천 K", "조합": "변수 조합"},
+    )
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        height=430,
+        template="plotly_white",
+        margin=dict(l=20, r=30, t=60, b=30),
+        yaxis={"categoryorder": "array", "categoryarray": combo_df["조합"].tolist()[::-1]},
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption("K값이 클수록 학생 유형이 세분화됩니다. 하지만 수업 전략으로 쓰기에는 단순하고 안정적인 K=2가 더 적합합니다.")
+
+    st.subheader("데이터를 관통하는 핵심 패턴")
+    st.markdown(
+        """
+<div class="soft-card">
+  <div class="card-title">마음 상태 + 학습태도 = K의 안정화</div>
+  <div class="card-text">
+    수학불안·자기효능감·흥미만 보면 학생 차이가 복잡하게 나뉩니다.<br>
+    그러나 학습태도를 함께 고려하면 학생 집단은 <b>수업에 비교적 잘 참여하는 집단</b>과 <b>수학불안이 높고 지원이 필요한 집단</b>으로 안정적으로 정리됩니다.
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.subheader("K=2의 수업적 의미")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(
+            """
+<div class="cluster-card">
+  <div class="cluster-stripe" style="background:#0d9e75"></div>
+  <div class="cluster-name">수업에 비교적 잘 참여하는 집단</div>
+  <div class="cluster-sub">수학에 안정적으로 참여하며, 현재의 학습 패턴을 유지할 수 있는 그룹입니다.</div>
+  <span class="badge badge-green">유지·확장 지원</span>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with col2:
+        st.markdown(
+            """
+<div class="cluster-card">
+  <div class="cluster-stripe" style="background:#e03131"></div>
+  <div class="cluster-name">수학불안이 높고 지원이 필요한 집단</div>
+  <div class="cluster-sub">심리적 불안을 낮추고, 교사의 적극적 개입과 맞춤형 지지가 필요한 그룹입니다.</div>
+  <span class="badge badge-red">우선 지원 필요</span>
+</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        """
+<div class="callout">
+  <b>최종 제언</b><br>
+  해석 가능성과 수업 적용 가능성을 고려하여, 4개 변수 전체를 포함한 <b>K=2 군집 모델</b>을 권장합니다.
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("원본 PDF 리포트 보기", expanded=False):
+        display_pdf_file("Student_Clustering_via_Variable_Selection.pdf")
+
+
 # ─────────────────────────────────────────────────────────────
 # Sidebar
 # ─────────────────────────────────────────────────────────────
@@ -950,8 +1188,9 @@ tabs = st.tabs([
     "① 연구 개요·데이터",
     "② 문항·전처리",
     "③ K 탐색",
-    "④ 군집 시각화",
-    "⑤ 결론·지도 방안",
+    "④ K탐색 결과",
+    "⑤ 군집 시각화",
+    "⑥ 결론·지도 방안",
 ])
 
 # ── Tab 1
@@ -1074,6 +1313,10 @@ with tabs[2]:
 
 # ── Tab 4
 with tabs[3]:
+    render_k_exploration_result_tab()
+
+# ── Tab 5
+with tabs[4]:
     section(
         "Cluster Visualization",
         "군집 프로파일을 여러 시각 요소로 확인",
@@ -1108,8 +1351,8 @@ with tabs[3]:
     st.plotly_chart(fig_centroid_step(res, step), use_container_width=True)
     st.caption("K-평균 군집화는 임의의 중심점에서 출발해, 학생들을 가까운 중심에 배정하고 중심을 다시 계산하는 과정을 반복합니다. 중심점이 거의 움직이지 않으면 최종 군집이 결정됩니다.")
 
-# ── Tab 5
-with tabs[4]:
+# ── Tab 6
+with tabs[5]:
     section(
         "Conclusion & Teaching Strategies",
         "군집별 특징과 맞춤형 지도 방안",
